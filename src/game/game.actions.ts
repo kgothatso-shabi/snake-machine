@@ -1,118 +1,176 @@
-import { assign, spawn, send } from 'xstate'
+import { assign, send, spawn } from 'xstate'
 
+import { BONUS_LIFETIME_TICKS, FOODS_UNTIL_BONUS } from 'src/constants'
+import { clampMaze } from 'src/mazes'
+import { clampSpeed } from 'src/settings'
+import { renderFrame } from 'src/renderer'
 import snakeMachine from 'src/snake/snake.machine'
 import foodMachine from 'src/food/food.machine'
 import bonusMachine from 'src/bonus/bonus.machine'
+import type {
+  BonusActor,
+  FoodActor,
+  GameContext,
+  GameEvent,
+  RenderState,
+  SnakeActor,
+} from 'src/types'
 
 import {
-  getNextSnakePosition,
-  getInitialContextForFood,
+  getBonusContext,
+  getFoodContext,
   getInitialContextForBonus,
+  getInitialContextForFood,
+  getNextSnakePosition,
 } from './game.selectors'
+import {
+  getBonusScore,
+  getCurrentSpeed,
+  getFoodScore,
+  getSpeedBoost,
+} from './game.scoring'
 
-import Renderer from 'src/renderer'
+const assignGame = (
+  assignment: Partial<{
+    [K in keyof GameContext]: (
+      context: GameContext,
+      event: GameEvent
+    ) => GameContext[K]
+  }>
+) => assign<GameContext, GameEvent>(assignment)
 
-export const spawnSnake = assign({
-  snake: () => spawn(snakeMachine),
+/* ---------------------------------- actors --------------------------------- */
+
+export const spawnSnake = assignGame({
+  snake: () => spawn(snakeMachine) as SnakeActor,
 })
 
-export const spawnFood = assign({
+export const spawnFood = assignGame({
   food: (context) =>
-    spawn(foodMachine.withContext(getInitialContextForFood(context))),
+    spawn(
+      foodMachine.withContext(getInitialContextForFood(context))
+    ) as unknown as FoodActor,
 })
 
-export const spawnBonus = assign({
+export const spawnBonus = assignGame({
   bonus: (context) =>
-    spawn(bonusMachine.withContext(getInitialContextForBonus(context))),
+    spawn(
+      bonusMachine.withContext(getInitialContextForBonus(context))
+    ) as unknown as BonusActor,
 })
 
-export const registerKeystroke = assign({
-  keystrokes: (context, event) => [...context.keystrokes, event.key],
+/* -------------------------------- game state -------------------------------- */
+
+export const resetGameData = assignGame({
+  keystrokes: () => [],
+  speedBoost: () => 0,
+  countdownToBonus: () => FOODS_UNTIL_BONUS,
+  countdownToRemoveBonus: () => BONUS_LIFETIME_TICKS,
+  bonus: () => null,
+  score: () => 0,
 })
 
-export const resetGameData = assign({
-  keystrokes: [],
-  countdownToBonus: 4,
-  countdownToRemoveBonus: 20,
-  bonus: null,
-  score: 0,
+export const resetBonus = assignGame({
+  bonus: () => null,
+  countdownToBonus: () => FOODS_UNTIL_BONUS,
+  countdownToRemoveBonus: () => BONUS_LIFETIME_TICKS,
 })
 
-export const removeKeystroke = assign({
+export const registerKeystroke = assignGame({
+  keystrokes: (context, event) =>
+    event.type === 'KEY_PRESS'
+      ? [...context.keystrokes, event.key]
+      : context.keystrokes,
+})
+
+export const removeKeystroke = assignGame({
   keystrokes: (context) => context.keystrokes.slice(1),
 })
 
-export const decreaseCountdownToBonus = assign({
+export const decreaseCountdownToBonus = assignGame({
   countdownToBonus: (context) =>
     context.bonus ? context.countdownToBonus : context.countdownToBonus - 1,
 })
 
-export const decreaseCountdownToRemoveBonus = assign({
+export const decreaseCountdownToRemoveBonus = assignGame({
   countdownToRemoveBonus: (context) => context.countdownToRemoveBonus - 1,
 })
 
-export const resetBonus = assign({
-  bonus: null,
-  countdownToBonus: 4,
-  countdownToRemoveBonus: 20,
+export const updateScoreWithFood = assignGame({
+  score: (context) =>
+    context.score +
+    getFoodScore(getCurrentSpeed(context.speed, context.speedBoost)),
 })
 
-export const tellSnakeToEatFood = send('EAT_FOOD', {
-  to: (context) => context.snake!,
+export const updateScoreWithBonus = assignGame({
+  score: (context) =>
+    context.score +
+    getBonusScore(
+      getCurrentSpeed(context.speed, context.speedBoost),
+      context.countdownToRemoveBonus
+    ),
 })
 
-export const tellSnakeToEatBonus = send('EAT_BONUS', {
-  to: (context) => context.snake!,
+/** Speeds the snake up one level each time the score reaches another multiple of 300. */
+export const updateSpeedBoost = assignGame({
+  speedBoost: (context) => getSpeedBoost(context.score),
 })
 
-export const tellSnakeToCrash = send('CRASH', {
-  to: (context) => context.snake!,
+/* --------------------------------- settings --------------------------------- */
+
+export const setSpeed = assignGame({
+  speed: (context, event) =>
+    event.type === 'SET_SPEED' ? clampSpeed(event.speed) : context.speed,
 })
 
-export const updateSnakePosition = send(
+export const setMaze = assignGame({
+  maze: (context, event) =>
+    event.type === 'SET_MAZE' ? clampMaze(event.maze) : context.maze,
+})
+
+/* ------------------------------ messages to snake ----------------------------- */
+
+const toSnake = { to: (context: GameContext) => context.snake! }
+
+export const tellSnakeToEatFood = send<GameContext, GameEvent>(
+  { type: 'EAT_FOOD' },
+  toSnake
+)
+
+export const tellSnakeToEatBonus = send<GameContext, GameEvent>(
+  { type: 'EAT_BONUS' },
+  toSnake
+)
+
+export const tellSnakeToCrash = send<GameContext, GameEvent>(
+  { type: 'CRASH' },
+  toSnake
+)
+
+export const updateSnakePosition = send<GameContext, GameEvent>(
   (context) => ({
     type: 'UPDATE_POSITION',
     position: getNextSnakePosition(context),
   }),
-  { to: (context) => context.snake! }
+  toSnake
 )
 
-export const decreaseSpeed = assign({
-  speed: (context) => (context.speed > 1 ? context.speed - 1 : context.speed),
+/* -------------------------------- rendering --------------------------------- */
+
+const getRenderState = (
+  context: GameContext,
+  withSnake: boolean
+): RenderState => ({
+  snake: withSnake ? context.snake!.getSnapshot()!.context : null,
+  food: getFoodContext(context)!,
+  bonus: getBonusContext(context),
+  maze: context.maze,
+  score: context.score,
+  countdownToRemoveBonus: context.countdownToRemoveBonus,
 })
 
-export const increaseSpeed = assign({
-  speed: (context) => context.speed + 1,
-})
+export const drawGame = (context: GameContext): void =>
+  renderFrame(getRenderState(context, true))
 
-export const updateScoreWithFood = assign({
-  score: (context) => context.score + context.speed,
-})
-
-export const updateScoreWithBonus = assign({
-  score: (context) => context.score + 5 * (context.speed + 9) - 2 * (20 - context.countdownToRemoveBonus),
-})
-
-export const drawGame = (context) => {
-  new Renderer({
-    snake: context.snake.getSnapshot().context,
-    food: context.food.getSnapshot().context,
-    bonus: context.bonus?.getSnapshot().context,
-    score: context.score,
-    countdownToRemoveBonus: context.countdownToRemoveBonus,
-  })
-}
-
-export const drawGameWithoutSnake = (context) => {
-  new Renderer({
-    snake: null,
-    food: context.food.getSnapshot().context,
-    bonus: context.bonus?.getSnapshot().context,
-    score: context.score,
-    countdownToRemoveBonus: context.countdownToRemoveBonus,
-  })
-}
-
-export const decreaseBlinkingCountdown = assign({
-  blinkingCountdown: (context) => context.blinkingCountdown - 1,
-})
+export const drawGameWithoutSnake = (context: GameContext): void =>
+  renderFrame(getRenderState(context, false))

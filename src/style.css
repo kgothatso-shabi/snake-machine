@@ -1,12 +1,242 @@
-body {
-  background-color: #111;
-  color: #ddd;
-  overflow-y: scroll;
+:root {
+  color-scheme: dark;
+  /* Monochrome: black and cream white only (opacity makes the in-between tones). */
+  --bg: #000;
+  --cream: #f2ead3;
+  --panel: #000;
+  --panel-border: rgba(242, 234, 211, 0.35);
+  --text: var(--cream);
+  --muted: rgba(242, 234, 211, 0.6);
+  --lcd: var(--cream);
+
+  /* Game screen ratio: matches the canvas (see renderer.ts). */
+  --screen-ratio: 1.3333;
+  /* Vertical space taken by everything that is not the game screen. */
+  --chrome-height: 190px;
 }
 
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  min-height: 100dvh;
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+.app {
+  width: min(100%, 1200px);
+  margin: 0 auto;
+  padding: 24px 12px calc(24px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+/*
+ * The screen takes as much room as fits: the full width of the page, but never
+ * taller than the viewport minus the controls, so it works on phones (portrait
+ * and landscape), tablets and desktops alike.
+ */
 canvas {
-  margin: auto;
   display: block;
-  margin-top: 32px;
+  width: min(100%, calc((100dvh - var(--chrome-height)) * var(--screen-ratio)));
+  min-width: 240px;
+  max-width: 100%;
+  height: auto;
   border-radius: 12px;
+  image-rendering: pixelated;
+  /* Lets the swipe gestures steer the snake instead of scrolling the page. */
+  touch-action: none;
+}
+
+.status {
+  min-height: 1.4em;
+  margin: 0;
+  color: var(--lcd);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+button {
+  font: inherit;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:hover {
+  border-color: var(--lcd);
+}
+
+button:active {
+  background: var(--cream);
+  color: #000;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--lcd);
+  outline-offset: 2px;
+}
+
+.settings {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px 24px;
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stepper-label {
+  min-width: 3.2em;
+  color: var(--muted);
+}
+
+.stepper-value {
+  min-width: 1.6em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.stepper-value--wide {
+  min-width: 6.5em;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* On-screen D-pad: only on touch devices and narrow screens. */
+.dpad {
+  display: none;
+  --dpad-size: clamp(56px, 20vw, 84px);
+  grid-template-columns: repeat(3, var(--dpad-size));
+  grid-template-rows: repeat(3, var(--dpad-size));
+  grid-template-areas:
+    '. up .'
+    'left . right'
+    '. down .';
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.dpad button {
+  font-size: 1.6rem;
+  border-radius: 16px;
+  padding: 0;
+}
+
+.dpad-up {
+  grid-area: up;
+}
+.dpad-left {
+  grid-area: left;
+}
+.dpad-right {
+  grid-area: right;
+}
+.dpad-down {
+  grid-area: down;
+}
+
+@media (any-pointer: coarse), (max-width: 640px) {
+  .dpad {
+    display: grid;
+  }
+  :root {
+    /* Settings + status + D-pad (3 rows) + paddings. */
+    --chrome-height: 520px;
+  }
+}
+
+/* Phones held sideways: screen on the left, controls on the right. */
+@media (orientation: landscape) and (max-height: 560px) {
+  :root {
+    --chrome-height: 32px;
+  }
+
+  .app {
+    width: 100%;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'screen status'
+      'screen settings'
+      'screen dpad';
+    align-content: center;
+    justify-items: center;
+    column-gap: 16px;
+    padding: 12px calc(12px + env(safe-area-inset-right)) 12px
+      calc(12px + env(safe-area-inset-left));
+  }
+
+  canvas {
+    grid-area: screen;
+    width: min(100%, calc((100dvh - var(--chrome-height)) * var(--screen-ratio)));
+    min-width: 0;
+  }
+
+  .status {
+    grid-area: status;
+  }
+
+  .settings {
+    grid-area: settings;
+    width: auto;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .dpad {
+    grid-area: dpad;
+    --dpad-size: 52px;
+    gap: 6px;
+  }
+
+  .hint {
+    display: none;
+  }
+}
+
+/* Wide, short desktop windows: shrink the screen instead of scrolling. */
+@media (min-width: 641px) and (min-height: 561px) and (not (any-pointer: coarse)) {
+  :root {
+    --chrome-height: 200px;
+  }
+}
+
+.hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+@media (any-pointer: coarse) {
+  .hint {
+    display: none;
+  }
 }

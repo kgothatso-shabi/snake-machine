@@ -1,83 +1,113 @@
-import { GAME_HEIGHT, GAME_WIDTH } from 'src/constants'
+import { GRID_COLUMNS, GRID_ROWS } from 'src/constants'
 import * as drawingMaps from 'src/drawingMaps'
-import { GameContext } from 'src/types'
+import { isWall } from 'src/mazes'
+import type {
+  BonusContext,
+  Direction,
+  FoodContext,
+  GameContext,
+  Point,
+  SnakePosition,
+} from 'src/types'
 
-export const getInitialContextForFood = (context: GameContext) => {
-  let isEmpty, x, y
-  const bonusContext = context.bonus?.getSnapshot().context || {}
-  const snakeContext = context.snake!.getSnapshot().context
-  do {
-    x = Math.floor(Math.random() * (GAME_WIDTH + 1))
-    y = Math.floor(Math.random() * (GAME_HEIGHT + 1))
+/** A function returning a number in [0, 1), like `Math.random`. */
+export type RandomFn = () => number
 
-    if (
-      (x === bonusContext.x && y === bonusContext.y) ||
-      (x === bonusContext.x + 1 && y === bonusContext.y) ||
-      snakeContext.body
-        .slice(0, -1)
-        .some((item) => x === item.x && y === item.y)
-    ) {
-      isEmpty = false
-    } else {
-      isEmpty = true
-    }
-  } while (!isEmpty)
+const MAX_X = GRID_COLUMNS - 1
+const MAX_Y = GRID_ROWS - 1
 
-  return { x, y }
+/** The cell next to `point` in `direction`. The field wraps around its edges. */
+export const step = (point: Point, direction: Direction): Point => {
+  switch (direction) {
+    case 'up':
+      return { x: point.x, y: point.y === 0 ? MAX_Y : point.y - 1 }
+    case 'down':
+      return { x: point.x, y: point.y === MAX_Y ? 0 : point.y + 1 }
+    case 'left':
+      return { x: point.x === 0 ? MAX_X : point.x - 1, y: point.y }
+    case 'right':
+      return { x: point.x === MAX_X ? 0 : point.x + 1, y: point.y }
+  }
 }
 
-export const getInitialContextForBonus = (context: GameContext) => {
-  let isEmpty, x, y
-  const foodContext = context.food.getSnapshot().context
-  const snakeContext = context.snake.getSnapshot().context
-  do {
-    x = Math.floor(Math.random() * (GAME_WIDTH))
-    y = Math.floor(Math.random() * (GAME_HEIGHT + 1))
+export const getSnakeHead = (context: GameContext): SnakePosition =>
+  context.snake!.getSnapshot()!.context.body[0]
 
-    if (
-      (x === foodContext.x && y === foodContext.y) ||
-      snakeContext.body
-        .slice(0, -1)
-        .some((item) => x === item.x && y === item.y)
-    ) {
-      isEmpty = false
-    } else {
-      isEmpty = true
+/** Where the snake's head goes on the next tick. */
+export const getNextSnakePosition = (context: GameContext): SnakePosition => {
+  const head = getSnakeHead(context)
+  const direction = context.keystrokes[0] || head.direction
+  return { ...step(head, direction), direction }
+}
+
+/** The cells occupied by a bonus, which is two cells wide. */
+export const getBonusCells = (bonus: BonusContext): [Point, Point] => [
+  { x: bonus.x, y: bonus.y },
+  { x: bonus.x + 1, y: bonus.y },
+]
+
+export const getFoodContext = (context: GameContext): FoodContext | undefined =>
+  context.food?.getSnapshot()?.context
+
+export const getBonusContext = (
+  context: GameContext
+): BonusContext | undefined => context.bonus?.getSnapshot()?.context
+
+const samePoint = (a: Point, b: Point) => a.x === b.x && a.y === b.y
+
+/**
+ * Snake cells that block new items. The tail is left out because it moves out
+ * of the way on the next tick.
+ */
+const getSnakeObstacles = (context: GameContext): Point[] =>
+  context.snake!.getSnapshot()!.context.body.slice(0, -1)
+
+const pickRandom = <T>(items: readonly T[], random: RandomFn): T | undefined =>
+  items[Math.floor(random() * items.length)]
+
+/** All cells where a one-cell item fits, given the cells already taken. */
+const getFreeCells = (context: GameContext, taken: Point[]): Point[] => {
+  const snake = getSnakeObstacles(context)
+  const cells: Point[] = []
+  for (let y = 0; y < GRID_ROWS; y++) {
+    for (let x = 0; x < GRID_COLUMNS; x++) {
+      const cell = { x, y }
+      const blocked =
+        isWall(context.maze, cell) ||
+        snake.some((part) => samePoint(part, cell)) ||
+        taken.some((other) => samePoint(other, cell))
+      if (!blocked) cells.push(cell)
     }
-  } while (!isEmpty)
+  }
+  return cells
+}
+
+/** Picks a free cell for the next piece of food. */
+export const getInitialContextForFood = (
+  context: GameContext,
+  random: RandomFn = Math.random
+): FoodContext => {
+  const bonus = getBonusContext(context)
+  const taken = bonus ? getBonusCells(bonus) : []
+  return pickRandom(getFreeCells(context, taken), random) ?? { x: 0, y: 0 }
+}
+
+/** Picks two free, side-by-side cells for the next bonus and a random sprite. */
+export const getInitialContextForBonus = (
+  context: GameContext,
+  random: RandomFn = Math.random
+): BonusContext => {
+  const food = getFoodContext(context)
+  const free = getFreeCells(context, food ? [food] : [])
+  const isFree = (cell: Point) => free.some((other) => samePoint(other, cell))
+  const spots = free.filter(
+    (cell) => cell.x < MAX_X && isFree({ x: cell.x + 1, y: cell.y })
+  )
+  const { x, y } = pickRandom(spots, random) ?? { x: 0, y: 0 }
 
   return {
-    spriteIndex: Math.floor(Math.random() * drawingMaps.bonus.length),
     x,
     y,
+    spriteIndex: Math.floor(random() * drawingMaps.bonus.length),
   }
-}
-
-export const getNextSnakePosition = (context: GameContext) => {
-  const snakeHead = getSnakeHead(context)
-  const direction = context.keystrokes[0] || snakeHead.direction
-
-  let x = snakeHead.x
-  let y = snakeHead.y
-
-  switch (direction) {
-    case 'down':
-      y = snakeHead.y === GAME_HEIGHT ? 0 : snakeHead.y + 1
-      break
-    case 'up':
-      y = snakeHead.y === 0 ? GAME_HEIGHT : snakeHead.y - 1
-      break
-    case 'right':
-      x = snakeHead.x === GAME_WIDTH ? 0 : snakeHead.x + 1
-      break
-    case 'left':
-      x = snakeHead.x === 0 ? GAME_WIDTH : snakeHead.x - 1
-      break
-  }
-
-  return { x, y, direction }
-}
-
-export const getSnakeHead = (context: GameContext) => {
-  return context.snake!.getSnapshot().context.body[0]
 }

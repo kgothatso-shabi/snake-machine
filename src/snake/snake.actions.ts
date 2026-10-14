@@ -1,19 +1,23 @@
 import { assign } from 'xstate'
-import { SnakeContext, UpdatePositionEvent } from 'src/types'
+import type { SnakeContext, SnakeEvent } from 'src/types'
 
-export const appendBody = assign<SnakeContext, UpdatePositionEvent>({
-  body: (context, event) => [event.position, ...context.body],
+/** Adds the new head. */
+export const appendBody = assign<SnakeContext, SnakeEvent>({
+  body: (context, event) =>
+    event.type === 'UPDATE_POSITION'
+      ? [event.position, ...context.body]
+      : context.body,
 })
 
-export const registerFoodEaten = assign<SnakeContext, UpdatePositionEvent>({
+/** Marks the head as carrying food, so it is drawn with a bump. */
+export const registerFoodEaten = assign<SnakeContext, SnakeEvent>({
   body: (context) =>
     context.body.map((item, i) =>
       i === 0 ? { ...item, withFood: true } : item
     ),
 })
 
-export const removeLastBody = assign<SnakeContext, UpdatePositionEvent>(
-  (context) => ({
-    body: context.body.slice(0, -1),
-  })
-)
+/** Drops the tail, so the snake keeps its length while moving. */
+export const removeLastBody = assign<SnakeContext, SnakeEvent>({
+  body: (context) => context.body.slice(0, -1),
+})

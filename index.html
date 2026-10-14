@@ -2,12 +2,53 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no"
+    />
+    <meta name="description" content="A remake of the classic Snake II Nokia 3310 game" />
+    <meta name="author" content="The Native Black" />
+    <meta name="theme-color" content="#000000" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/src/style.css" />
     <title>Snake II</title>
   </head>
   <body>
-    <canvas></canvas>
+    <main class="app">
+      <canvas aria-label="Snake II game screen"></canvas>
+
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+
+      <section class="settings" aria-label="Game settings">
+        <div class="stepper">
+          <span class="stepper-label">Speed</span>
+          <button type="button" data-action="speed-down" aria-label="Decrease speed">&minus;</button>
+          <output id="speed-value" class="stepper-value">8</output>
+          <button type="button" data-action="speed-up" aria-label="Increase speed">+</button>
+        </div>
+        <div class="stepper">
+          <span class="stepper-label">Maze</span>
+          <button type="button" data-action="maze-prev" aria-label="Previous maze">&lsaquo;</button>
+          <output id="maze-value" class="stepper-value stepper-value--wide">None</output>
+          <button type="button" data-action="maze-next" aria-label="Next maze">&rsaquo;</button>
+        </div>
+        <div class="actions">
+          <button type="button" id="pause-button" data-action="pause">Pause</button>
+          <button type="button" data-action="restart">New game</button>
+        </div>
+      </section>
+
+      <section id="touch-controls" class="dpad" aria-label="On-screen controls">
+        <button type="button" class="dpad-up" data-direction="up" aria-label="Up">&#9650;</button>
+        <button type="button" class="dpad-left" data-direction="left" aria-label="Left">&#9664;</button>
+        <button type="button" class="dpad-right" data-direction="right" aria-label="Right">&#9654;</button>
+        <button type="button" class="dpad-down" data-direction="down" aria-label="Down">&#9660;</button>
+      </section>
+
+      <p class="hint">
+        Arrows / WASD steer &middot; P or Space pause &middot; +/&minus; speed &middot; M maze &middot; R new game
+      </p>
+    </main>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

@@ -1,6 +1,10 @@
-export const food = [' x  ', 'x x ', ' x  ', '    ']
+import type { Sprite } from 'src/types'
 
-export const bonus = [
+export const food: Sprite = [' x  ', 'x x ', ' x  ', '    ']
+
+export const wall: Sprite = ['xxxx', 'xxxx', 'xxxx', 'xxxx']
+
+export const bonus: readonly Sprite[] = [
   ['xx   x  ', 'xx  xxx ', '  xxxxxx', '    x x '],
   ['  xx    ', ' x xx x ', 'xxxxxxx ', '  xxxx  '],
   ['  xxxx  ', 'xxxxxxxx', 'x xxxx x', 'x x  x x'],
@@ -9,7 +13,21 @@ export const bonus = [
   ['    xx  ', 'x  xx x ', 'x xxxxx ', ' xxxxxxx'],
 ]
 
-export const snake = {
+type DirectionalSprites = Record<'left' | 'right' | 'up' | 'down', Sprite>
+type TurnSprites = Record<
+  'upLeft' | 'upRight' | 'downLeft' | 'downRight',
+  Sprite
+>
+
+export const snake: {
+  head: DirectionalSprites
+  headWithMouthOpen: DirectionalSprites
+  body: DirectionalSprites
+  bodyWithFood: DirectionalSprites
+  bodyTurning: TurnSprites
+  bodyTurningWithFood: TurnSprites
+  tail: DirectionalSprites
+} = {
   head: {
     left: ['   x', ' xx ', ' xxx', '    '],
     right: ['x   ', ' xx ', 'xxx ', '    '],
@@ -54,7 +72,7 @@ export const snake = {
   },
 }
 
-export const numbers = [
+export const numbers: readonly Sprite[] = [
   ['xxx ', 'x x ', 'x x ', 'x x ', 'xxx '],
   [' x ', 'xx ', ' x ', ' x ', ' x '],
   ['xxx ', '  x ', 'xxx ', 'x   ', 'xxx '],

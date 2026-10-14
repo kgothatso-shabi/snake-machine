@@ -1,6 +1,7 @@
 import { createMachine } from 'xstate'
-import { FoodContext } from 'src/types'
+import type { FoodContext } from 'src/types'
 
+/** Holds the position of the food. It has no behaviour, only data. */
 const foodMachine = createMachine<FoodContext>({
   id: 'food',
   context: {
