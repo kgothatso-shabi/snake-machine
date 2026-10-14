@@ -43,8 +43,8 @@ You need [Node.js](https://nodejs.org/) 18 or newer.
 
 ```bash
 # Clone this repository
-git clone https://github.com/YOUR-USERNAME/YOUR-REPOSITORY
-cd YOUR-REPOSITORY
+git clone [https://github.com/kgothatso-shabi/snake-machine]
+cd snake-machine
 
 # Install dependencies
 npm install
