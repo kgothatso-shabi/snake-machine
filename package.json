@@ -6,7 +6,7 @@
   "main": "electron/main.js",
   "repository": {
     "type": "git",
-    "url": "https://github.com/flplima/snake-machine"
+    "url": "https://github.com/kgothatso-shabi/snake-machine/"
   },
   "author": {
     "name": "The Native Black"
